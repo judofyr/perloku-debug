@@ -1,10 +1,5 @@
 #!/bin/sh
 
-if [ -f $1/app.psgi ]; then
-  echo "PSGI"
-else
-  echo "Perl"
-fi
-
+echo "Nice"
 exit 0
 
