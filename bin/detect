@@ -1,5 +1,12 @@
 #!/bin/sh
 
-echo Nice
+[ -f $1/carton.lock ] || exit 1
+
+if [ -f $1/app.psgi ]; then
+  echo "PSGI"
+else
+  echo "Perl"
+fi
+
 exit 0
 
