@@ -1,5 +1,8 @@
 #!/bin/sh
 
+echo Nice
+exit 0
+
 [ -f $1/carton.lock ] || exit 1
 
 if [ -f $1/app.psgi ]; then
