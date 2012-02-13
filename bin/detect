@@ -1,7 +1,5 @@
 #!/bin/sh
 
-[ -f $1/carton.lock ] || exit 1
-
 if [ -f $1/app.psgi ]; then
   echo "PSGI"
 else
