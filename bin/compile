@@ -11,6 +11,7 @@ CACHE_DIR=$2
 rm -rf "$CACHE_DIR/perl-deps"
 VENDOR_DEPS="$BUILD_DIR/local"
 CACHE_DEPS="$CACHE_DIR/local"
+rm -rf "$CACHE_DEPS"
 
 PERL_VERSION="5.14.2"
 PERL_PACKAGE="perloku.s3.amazonaws.com/perl-$PERL_VERSION.tgz"
@@ -22,13 +23,12 @@ echo "-----> Vendoring Perl"
 mkdir -p $VENDORED_PERL  && curl $PERL_PACKAGE -s -o -  | tar xzf - -C $VENDORED_PERL
 
 # Set up so we can use Perl right away
-export PATH="$VENDORED_PERL/bin:$CACHE_DIR/local/bin:$PATH"
+export PATH="$VENDORED_PERL/bin:$CACHE_DEPS/bin:$PATH"
 export PERL5LIB="$VENDORED_PERL/lib/$PERL_VERSION:$VENDORED_PERL/lib/site_perl/$PERL_VERSION"
-export PERL5OPT="-Mlocal::lib=$CACHE_DIR/local"
 
 echo "Using Perl $PERL_VERSION" | indent
 
-CPANM="perl -S cpanm --notest -l $CACHE_DEPS"
+CPANM="perl -S cpanm --notest"
 
 if [ -f $BUILD_DIR/app.psgi ]; then
   echo "-----> Installing Starman for PSGI"
@@ -37,22 +37,23 @@ fi
 
 if [ -f $BUILD_DIR/carton.lock ]; then
   echo "-----> Installing Carton"
-  $CPANM carton 2>&1 | indent
-fi
+  $CPANM Carton 2>&1 | indent
 
-echo "-----> Installing dependencies"
+  echo "-----> Installing dependencies using Carton"
 
-if [ -f $BUILD_DIR/carton.lock ]; then
   # Wrap cpanm as shell script which invokes the correct perl interpreter
   # We need this for carton
   mkdir -p /tmp/cpanm-bin
   echo "perl -S $(which cpanm) \"\$@\"" > /tmp/cpanm-bin/cpanm
   chmod +x /tmp/cpanm-bin/cpanm
+
   export PATH="/tmp/cpanm-bin:$PATH"
+  export PERL5OPT="-Mlocal::lib=$CACHE_DIR/local"
 
   perl -S carton install --path "$CACHE_DEPS" 2>&1 | indent
 else
-  $CPANM --installdeps .
+  echo "-----> Installing dependencies using CPANM"
+  $CPANM -l "$CACHE_DEPS" --installdeps .
 fi
 
 cp -R "$CACHE_DEPS" "$VENDOR_DEPS"
