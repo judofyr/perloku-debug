@@ -7,6 +7,11 @@ indent() {
 BUILD_DIR=$1
 CACHE_DIR=$2
 
+# Clear previous cache dir
+rm -rf "$CACHE_DIR/perl-deps"
+VENDOR_DEPS="$BUILD_DIR/local"
+CACHE_DEPS="$CACHE_DIR/local"
+
 PERL_VERSION="5.14.2"
 PERL_PACKAGE="perloku.s3.amazonaws.com/perl-$PERL_VERSION.tgz"
 
@@ -17,36 +22,39 @@ echo "-----> Vendoring Perl"
 mkdir -p $VENDORED_PERL  && curl $PERL_PACKAGE -s -o -  | tar xzf - -C $VENDORED_PERL
 
 # Set up so we can use Perl right away
-export PATH="$VENDORED_PERL/bin:$PATH"
+export PATH="$VENDORED_PERL/bin:$CACHE_DIR/local/bin:$PATH"
 export PERL5LIB="$VENDORED_PERL/lib/$PERL_VERSION:$VENDORED_PERL/lib/site_perl/$PERL_VERSION"
 
 echo "Using Perl $PERL_VERSION" | indent
 
-# Clear previous cache dir
-rm -rf "$CACHE_DIR/perl-deps"
-VENDOR_DEPS="$BUILD_DIR/local"
-CACHE_DEPS="$CACHE_DIR/local"
 
-CPANM="perl -S cpanm --notest -L $CACHE_DEPS"
-
-echo "-----> Installing Carton"
-$CPANM carton 2>&1 | indent
+CPANM="perl -S cpanm --notest -l $CACHE_DEPS"
 
 if [ -f $BUILD_DIR/app.psgi ]; then
-  echo "-----> Installing Starman"
+  echo "-----> Installing Starman for PSGI"
   $CPANM Starman 2>&1 | indent
+fi
+
+if [ -f $BUILD_DIR/carton.lock ]; then
+  echo "-----> Installing Carton"
+  $CPANM carton 2>&1 | indent
 fi
 
 echo "-----> Installing dependencies"
 
-# Wrap cpanm as shell script which invokes the correct perl interpreter
-# We need this for carton
-mkdir -p /tmp/bin
-echo "perl -S $(which cpanm) \"\$@\"" > /tmp/bin/cpanm
-chmod +x /tmp/bin/cpanm
-export PATH="/tmp/bin:$PATH"
+if [ -f $BUILD_DIR/carton.lock ]; then
+  # Wrap cpanm as shell script which invokes the correct perl interpreter
+  # We need this for carton
+  mkdir -p /tmp/cpanm-bin
+  echo "perl -S $(which cpanm) \"\$@\"" > /tmp/cpanm-bin/cpanm
+  chmod +x /tmp/cpanm-bin/cpanm
+  export PATH="/tmp/cpanm-bin:$PATH"
 
-perl -S carton install --path "$CACHE_DEPS" 2>&1 | indent
+  perl -S carton install --path "$CACHE_DEPS" 2>&1 | indent
+else
+  $CPANM --installdeps .
+fi
+
 cp -R "$CACHE_DEPS" "$VENDOR_DEPS"
 echo "Dependencies installed" | indent
 
