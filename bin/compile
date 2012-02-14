@@ -11,6 +11,7 @@ CACHE_DIR=$2
 rm -rf "$CACHE_DIR/perl-deps"
 VENDOR_DEPS="$BUILD_DIR/local"
 CACHE_DEPS="$CACHE_DIR/local"
+PERLOKU_DEPS="$CACHE_DEPS/perloku"
 rm -rf "$CACHE_DEPS"
 
 PERL_VERSION="5.14.2"
@@ -23,12 +24,20 @@ echo "-----> Vendoring Perl"
 mkdir -p $VENDORED_PERL  && curl $PERL_PACKAGE -s -o -  | tar xzf - -C $VENDORED_PERL
 
 # Set up so we can use Perl right away
-export PATH="$VENDORED_PERL/bin:$CACHE_DEPS/bin:$PATH"
+export PATH="$VENDORED_PERL/bin:$PATH"
 export PERL5LIB="$VENDORED_PERL/lib/$PERL_VERSION:$VENDORED_PERL/lib/site_perl/$PERL_VERSION"
+CPANM="perl -S cpanm --notest"
 
 echo "Using Perl $PERL_VERSION" | indent
 
-CPANM="perl -S cpanm --notest"
+# Set up local lib while preserving PERL5LIB
+local_lib() {
+  local lib="$PERL5LIB"
+  eval $(perl -Mlocal::lib=$1)
+  export PERL5LIB="$PERL5LIB:$lib"
+}
+
+local_lib "$PERLOKU_DEPS"
 
 if [ -f $BUILD_DIR/app.psgi ]; then
   echo "-----> Installing Starman for PSGI"
@@ -46,9 +55,7 @@ if [ -f $BUILD_DIR/carton.lock ]; then
   mkdir -p /tmp/cpanm-bin
   echo "perl -S $(which cpanm) \"\$@\"" > /tmp/cpanm-bin/cpanm
   chmod +x /tmp/cpanm-bin/cpanm
-
   export PATH="/tmp/cpanm-bin:$PATH"
-  export PERL5OPT="-Mlocal::lib=$CACHE_DIR/local"
 
   perl -S carton install --path "$CACHE_DEPS" 2>&1 | indent
 else
